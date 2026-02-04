@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 function splitSections(text: string) {
   // Divide antes de "TÍTULO" o antes de "1)" "2)" etc.
   const sections = text
-    .split(/\n(?=TÍTULO|\d\))/g)
+    .split(/\n(?=\d\))/g)
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -20,7 +20,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string>("");
 
-  const sections = useMemo(() => (result ? splitSections(result) : []), [result]);
+  const sections = useMemo(() => {
+  if (!result) return [];
+  return splitSections(result).filter((s) => s.trim() !== "TÍTULO");
+}, [result]);
 
   async function handleGenerate() {
     if (!idea.trim()) return;
