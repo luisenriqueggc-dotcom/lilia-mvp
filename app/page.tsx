@@ -1,6 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+function splitSections(text: string) {
+  // Divide antes de "TÍTULO" o antes de "1)" "2)" etc.
+  const sections = text
+    .split(/\n(?=TÍTULO|\d\))/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Fallback si no se detectan secciones
+  return sections.length ? sections : [text.trim()];
+}
 
 export default function Home() {
   const [idea, setIdea] = useState("");
@@ -8,6 +19,8 @@ export default function Home() {
   const [format, setFormat] = useState("post");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string>("");
+
+  const sections = useMemo(() => (result ? splitSections(result) : []), [result]);
 
   async function handleGenerate() {
     if (!idea.trim()) return;
@@ -22,15 +35,20 @@ export default function Home() {
         body: JSON.stringify({ idea, network, format }),
       });
 
-      const data = await res.json();
+      // ✅ Robusto: intenta JSON, si falla lee texto
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        const raw = await res.text().catch(() => "");
+        data = { content: raw };
+      }
 
       if (!res.ok) {
         throw new Error(data?.error || "Error al generar contenido");
       }
 
-      // ✅ AQUÍ ESTÁ LA CLAVE
       setResult(data?.content || "");
-
     } catch (e: any) {
       setResult("Oops: " + (e?.message || "Error desconocido"));
     } finally {
@@ -38,8 +56,12 @@ export default function Home() {
     }
   }
 
-  function copyToClipboard() {
+  function copyAll() {
     navigator.clipboard.writeText(result);
+  }
+
+  function copySection(text: string) {
+    navigator.clipboard.writeText(text);
   }
 
   return (
@@ -101,17 +123,38 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Resultado</h2>
             <button
-              onClick={copyToClipboard}
+              onClick={copyAll}
               disabled={!result}
               className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
             >
-              Copiar
+              Copiar todo
             </button>
           </div>
 
-          <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-gray-50 p-4 text-sm">
-            {result || "Aquí aparecerá el texto…"}
-          </pre>
+          {!result ? (
+            <div className="mt-3 rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
+              Aquí aparecerá el texto…
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {sections.map((section, i) => (
+                <div key={i} className="rounded-xl border bg-gray-50 p-4 text-sm">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="font-medium text-gray-700">
+                      Sección {i + 1}
+                    </span>
+                    <button
+                      onClick={() => copySection(section)}
+                      className="rounded-lg border px-3 py-2 text-xs hover:bg-white"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                  <pre className="whitespace-pre-wrap">{section}</pre>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </main>
